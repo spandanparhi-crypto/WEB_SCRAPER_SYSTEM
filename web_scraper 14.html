@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SCRAPE/SYS — Web Scraping System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B1220;
+    --panel:#121A2B;
+    --panel-alt:#17203A;
+    --border:#232E48;
+    --text:#E7ECF5;
+    --muted:#8B99B8;
+    --amber:#F5A623;
+    --amber-dim:#7A5417;
+    --green:#35D488;
+    --red:#FF5C5C;
+    --mono:'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
+    --sans:'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(245,166,35,0.06), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    min-height:100vh;
+    padding:28px 20px 60px;
+  }
+  .wrap{max-width:1180px;margin:0 auto;}
+
+  /* ---------- header ---------- */
+  header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding-bottom:20px;margin-bottom:22px;
+    border-bottom:1px solid var(--border);
+  }
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand .glyph{
+    width:34px;height:34px;border:1px solid var(--amber);
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);color:var(--amber);font-weight:700;font-size:16px;
+    border-radius:4px;
+  }
+  .brand h1{font-family:var(--mono);font-size:16px;letter-spacing:0.08em;margin:0;font-weight:600;}
+  .brand p{margin:2px 0 0;color:var(--muted);font-size:12.5px;font-family:var(--mono);}
+  .status-pill{
+    font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;
+    padding:6px 12px;border-radius:20px;border:1px solid var(--border);
+    color:var(--muted);display:flex;align-items:center;gap:8px;
+  }
+  .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);}
+  .status-pill.idle .dot{background:var(--muted);}
+  .status-pill.run .dot{background:var(--amber);box-shadow:0 0 8px var(--amber);animation:pulse 1s infinite;}
+  .status-pill.run{color:var(--amber);border-color:var(--amber-dim);}
+  .status-pill.done .dot{background:var(--green);box-shadow:0 0 8px var(--green);}
+  .status-pill.done{color:var(--green);border-color:#1c4a37;}
+  .status-pill.err .dot{background:var(--red);box-shadow:0 0 8px var(--red);}
+  .status-pill.err{color:var(--red);border-color:#4a1c1c;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+
+  /* ---------- pipeline (signature element) ---------- */
+  .pipeline{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:0;
+    margin-bottom:22px;border:1px solid var(--border);border-radius:8px;overflow:hidden;
+    background:var(--panel);
+  }
+  .stage{
+    padding:14px 16px;position:relative;
+    border-right:1px solid var(--border);
+  }
+  .stage:last-child{border-right:none;}
+  .stage .n{font-family:var(--mono);font-size:10.5px;color:var(--muted);letter-spacing:.1em;}
+  .stage .label{font-family:var(--mono);font-size:13px;font-weight:600;margin-top:4px;color:var(--text);}
+  .stage .sub{font-size:11.5px;color:var(--muted);margin-top:3px;}
+  .stage::before{
+    content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--border);transition:background .25s;
+  }
+  .stage.active::before{background:var(--amber);}
+  .stage.ok::before{background:var(--green);}
+  .stage.fail::before{background:var(--red);}
+  .stage.active .label{color:var(--amber);}
+  .stage.ok .label{color:var(--green);}
+  .stage.fail .label{color:var(--red);}
+
+  /* ---------- main grid ---------- */
+  .grid{display:grid;grid-template-columns:360px 1fr;gap:20px;}
+  @media (max-width:880px){.grid{grid-template-columns:1fr;}}
+
+  .panel{
+    background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    padding:18px;
+  }
+  .panel h2{
+    font-family:var(--mono);font-size:12px;letter-spacing:.1em;color:var(--muted);
+    text-transform:uppercase;margin:0 0 14px;font-weight:600;
+  }
+
+  label{display:block;font-size:12.5px;color:var(--muted);margin:14px 0 6px;font-family:var(--mono);}
+  label:first-of-type{margin-top:0;}
+  input[type=text],input[type=number],input[type=url],select{
+    width:100%;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);
+    padding:9px 10px;border-radius:6px;font-family:var(--sans);font-size:13.5px;outline:none;
+    transition:border-color .15s;
+  }
+  input:focus,select:focus{border-color:var(--amber);}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+  .fields-list{margin-top:8px;}
+  .field-row{
+    display:grid;grid-template-columns:1fr 1fr 74px 26px;gap:6px;margin-bottom:6px;align-items:center;
+  }
+  .field-row input{padding:7px 8px;font-size:12.5px;}
+  .field-row select{padding:7px 6px;font-size:12px;}
+  .icon-btn{
+    background:transparent;border:1px solid var(--border);color:var(--muted);
+    width:26px;height:32px;border-radius:6px;cursor:pointer;font-size:14px;line-height:1;
+  }
+  .icon-btn:hover{border-color:var(--red);color:var(--red);}
+  .add-field{
+    margin-top:6px;background:transparent;border:1px dashed var(--border);color:var(--muted);
+    width:100%;padding:8px;border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:12px;
+  }
+  .add-field:hover{border-color:var(--amber);color:var(--amber);}
+
+  .help{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.4;}
+
+  .actions{display:flex;gap:10px;margin-top:20px;}
+  button.primary{
+    flex:1;background:var(--amber);color:#1a1200;border:none;font-weight:700;
+    padding:11px;border-radius:7px;cursor:pointer;font-family:var(--mono);font-size:13px;letter-spacing:.03em;
+    transition:filter .15s;
+  }
+  button.primary:hover{filter:brightness(1.08);}
+  button.primary:disabled{opacity:.5;cursor:not-allowed;}
+  button.ghost{
+    background:transparent;border:1px solid var(--border);color:var(--text);
+    padding:11px 14px;border-radius:7px;cursor:pointer;font-family:var(--mono);font-size:12.5px;
+  }
+  button.ghost:hover{border-color:var(--muted);}
+
+  .presets{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;}
+  .preset{
+    font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--border);
+    background:var(--panel-alt);padding:5px 9px;border-radius:20px;cursor:pointer;
+  }
+  .preset:hover{color:var(--amber);border-color:var(--amber-dim);}
+
+  /* ---------- right panel / tabs ---------- */
+  .tabs{display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid var(--border);}
+  .tab{
+    font-family:var(--mono);font-size:12px;color:var(--muted);padding:9px 14px;cursor:pointer;
+    border-bottom:2px solid transparent;letter-spacing:.04em;
+  }
+  .tab.active{color:var(--amber);border-bottom-color:var(--amber);}
+  .tabpane{display:none;}
+  .tabpane.active{display:block;}
+
+  .meta-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+  .meta-row .count{font-family:var(--mono);font-size:12px;color:var(--muted);}
+  .export-btns{display:flex;gap:8px;}
+  .export-btns button{
+    font-family:var(--mono);font-size:11.5px;background:var(--panel-alt);color:var(--text);
+    border:1px solid var(--border);padding:6px 12px;border-radius:6px;cursor:pointer;
+  }
+  .export-btns button:hover{border-color:var(--amber);color:var(--amber);}
+  .export-btns button:disabled{opacity:.4;cursor:not-allowed;}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  thead th{
+    text-align:left;font-family:var(--mono);font-size:10.5px;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.05em;padding:8px;border-bottom:1px solid var(--border);
+    position:sticky;top:0;background:var(--panel);
+  }
+  tbody td{padding:8px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:top;}
+  tbody tr:hover{background:var(--panel-alt);}
+  .table-scroll{max-height:440px;overflow:auto;border:1px solid var(--border);border-radius:8px;}
+  a.link{color:var(--amber);text-decoration:none;}
+  a.link:hover{text-decoration:underline;}
+
+  pre#jsonOut{
+    background:var(--panel-alt);border:1px solid var(--border);border-radius:8px;padding:14px;
+    max-height:440px;overflow:auto;font-family:var(--mono);font-size:12px;line-height:1.55;color:#c9d4e8;
+    white-space:pre-wrap;word-break:break-word;
+  }
+
+  #logOut{
+    background:#0A1020;border:1px solid var(--border);border-radius:8px;padding:12px 14px;
+    max-height:440px;overflow:auto;font-family:var(--mono);font-size:12px;line-height:1.7;
+  }
+  .log-line{white-space:pre-wrap;word-break:break-word;}
+  .log-line.info{color:var(--muted);}
+  .log-line.ok{color:var(--green);}
+  .log-line.warn{color:var(--amber);}
+  .log-line.err{color:var(--red);}
+  .log-time{color:#4b5876;margin-right:8px;}
+
+  .empty{
+    color:var(--muted);font-size:13px;padding:40px 10px;text-align:center;font-family:var(--mono);
+  }
+
+  footer{margin-top:26px;color:var(--muted);font-size:11.5px;font-family:var(--mono);line-height:1.6;}
+  footer b{color:var(--text);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="glyph">&gt;_</div>
+      <div>
+        <h1>SCRAPE / SYS</h1>
+        <p>client-side web scraping system — no server required</p>
+      </div>
+    </div>
+    <div class="status-pill idle" id="statusPill"><span class="dot"></span><span id="statusText">IDLE</span></div>
+  </header>
+
+  <div class="pipeline">
+    <div class="stage" id="stage-fetch">
+      <div class="n">01</div>
+      <div class="label">FETCH</div>
+      <div class="sub">retrieve page HTML</div>
+    </div>
+    <div class="stage" id="stage-parse">
+      <div class="n">02</div>
+      <div class="label">PARSE</div>
+      <div class="sub">build DOM tree</div>
+    </div>
+    <div class="stage" id="stage-extract">
+      <div class="n">03</div>
+      <div class="label">EXTRACT</div>
+      <div class="sub">apply selectors</div>
+    </div>
+    <div class="stage" id="stage-export">
+      <div class="n">04</div>
+      <div class="label">EXPORT</div>
+      <div class="sub">CSV / JSON ready</div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- CONFIG PANEL -->
+    <div class="panel">
+      <h2>Target</h2>
+
+      <label for="startUrl">Start URL</label>
+      <input type="url" id="startUrl" placeholder="https://quotes.toscrape.com/" value="https://quotes.toscrape.com/">
+
+      <div class="presets" id="presets">
+        <span class="preset" data-preset="quotes">quotes.toscrape.com</span>
+        <span class="preset" data-preset="books">books.toscrape.com</span>
+      </div>
+
+      <label for="itemSel">Item selector <span style="color:var(--muted);font-weight:400;">(each repeated card)</span></label>
+      <input type="text" id="itemSel" placeholder=".product-card" value=".quote">
+
+      <label>Fields <span style="color:var(--muted);font-weight:400;">(name / css selector / source)</span></label>
+      <div class="fields-list" id="fieldsList"></div>
+      <button class="add-field" id="addField" type="button">+ add field</button>
+
+      <div class="row2">
+        <div>
+          <label for="nextSel">Next-page selector</label>
+          <input type="text" id="nextSel" placeholder="li.next > a" value="li.next > a">
+        </div>
+        <div>
+          <label for="maxPages">Max pages</label>
+          <input type="number" id="maxPages" min="1" max="25" value="2">
+        </div>
+      </div>
+
+      <div class="row2">
+        <div>
+          <label for="delay">Delay (ms)</label>
+          <input type="number" id="delay" min="0" step="100" value="600">
+        </div>
+        <div>
+          <label for="proxy">Fetch mode</label>
+          <select id="proxy">
+            <option value="direct">Direct (CORS-enabled sites)</option>
+            <option value="proxy" selected>Via CORS proxy</option>
+          </select>
+        </div>
+      </div>
+      <div class="help">Most sites block cross-origin JS requests (CORS). "Via CORS proxy" routes the request through a public relay (allorigins.win) so this page can read the response. If a target keeps failing, try Direct mode, or use the Python version of this project for unrestricted access.</div>
+
+      <div class="actions">
+        <button class="primary" id="runBtn" type="button">▶ Run scrape</button>
+        <button class="ghost" id="stopBtn" type="button" disabled>Stop</button>
+      </div>
+    </div>
+
+    <!-- RESULTS PANEL -->
+    <div class="panel">
+      <div class="tabs">
+        <div class="tab active" data-tab="table">Table</div>
+        <div class="tab" data-tab="json">JSON</div>
+        <div class="tab" data-tab="log">Log</div>
+      </div>
+
+      <div class="meta-row">
+        <span class="count" id="resultCount">0 records</span>
+        <div class="export-btns">
+          <button id="exportCsv" disabled>⬇ CSV</button>
+          <button id="exportJson" disabled>⬇ JSON</button>
+        </div>
+      </div>
+
+      <div class="tabpane active" id="pane-table">
+        <div class="table-scroll" id="tableScroll">
+          <div class="empty">No data yet — configure a target and click Run scrape.</div>
+        </div>
+      </div>
+
+      <div class="tabpane" id="pane-json">
+        <pre id="jsonOut">[]</pre>
+      </div>
+
+      <div class="tabpane" id="pane-log">
+        <div id="logOut"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <b>How it works:</b> this file fetches the target HTML, parses it with the browser's DOMParser, applies your CSS selectors to pull out fields, optionally follows a "next page" link, then lets you export the results — all in-browser, no backend. &nbsp;|&nbsp;
+    <b>Note:</b> some sites render content with JavaScript and won't expose data in the raw HTML this tool fetches; those need a headless-browser approach instead.
+  </footer>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------------- state ----------------
+  let fieldIdCounter = 0;
+  let results = [];
+  let running = false;
+  let stopRequested = false;
+
+  const el = (id) => document.getElementById(id);
+  const fieldsList = el('fieldsList');
+
+  const PRESETS = {
+    quotes: {
+      url: 'https://quotes.toscrape.com/',
+      item: '.quote',
+      next: 'li.next > a',
+      fields: [
+        {name:'quote', sel:'.text', attr:'text'},
+        {name:'author', sel:'.author', attr:'text'},
+        {name:'author_link', sel:'a', attr:'href'}
+      ]
+    },
+    books: {
+      url: 'https://books.toscrape.com/',
+      item: 'article.product_pod',
+      next: 'li.next > a',
+      fields: [
+        {name:'title', sel:'h3 a', attr:'title'},
+        {name:'price', sel:'.price_color', attr:'text'},
+        {name:'availability', sel:'.availability', attr:'text'},
+        {name:'link', sel:'h3 a', attr:'href'}
+      ]
+    }
+  };
+
+  // ---------------- field row builder ----------------
+  function addFieldRow(name, sel, attr){
+    fieldIdCounter++;
+    const row = document.createElement('div');
+    row.className = 'field-row';
+    row.dataset.id = fieldIdCounter;
+    row.innerHTML = `
+      <input type="text" class="f-name" placeholder="field name" value="${name||''}">
+      <input type="text" class="f-sel" placeholder="css selector" value="${sel||''}">
+      <select class="f-attr">
+        <option value="text">text</option>
+        <option value="href">href</option>
+        <option value="src">src</option>
+        <option value="title">title</option>
+        <option value="alt">alt</option>
+      </select>
+      <button class="icon-btn" type="button" title="remove">✕</button>
+    `;
+    row.querySelector('.f-attr').value = attr || 'text';
+    row.querySelector('.icon-btn').addEventListener('click', () => row.remove());
+    fieldsList.appendChild(row);
+  }
+
+  function getFields(){
+    const rows = fieldsList.querySelectorAll('.field-row');
+    const fields = [];
+    rows.forEach(r => {
+      const name = r.querySelector('.f-name').value.trim();
+      const sel = r.querySelector('.f-sel').value.trim();
+      const attr = r.querySelector('.f-attr').value;
+      if(name) fields.push({name, sel, attr});
+    });
+    return fields;
+  }
+
+  el('addField').addEventListener('click', () => addFieldRow());
+
+  // default starting fields (quotes preset)
+  PRESETS.quotes.fields.forEach(f => addFieldRow(f.name, f.sel, f.attr));
+
+  // ---------------- presets ----------------
+  document.querySelectorAll('.preset').forEach(p => {
+    p.addEventListener('click', () => {
+      const cfg = PRESETS[p.dataset.preset];
+      if(!cfg) return;
+      el('startUrl').value = cfg.url;
+      el('itemSel').value = cfg.item;
+      el('nextSel').value = cfg.next;
+      fieldsList.innerHTML = '';
+      cfg.fields.forEach(f => addFieldRow(f.name, f.sel, f.attr));
+    });
+  });
+
+  // ---------------- tabs ----------------
+  document.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+      document.querySelectorAll('.tabpane').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      el('pane-' + t.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ---------------- logging ----------------
+  function log(msg, level){
+    level = level || 'info';
+    const line = document.createElement('div');
+    line.className = 'log-line ' + level;
+    const time = new Date().toLocaleTimeString();
+    line.innerHTML = `<span class="log-time">${time}</span>${escapeHtml(msg)}`;
+    el('logOut').appendChild(line);
+    el('logOut').scrollTop = el('logOut').scrollHeight;
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ---------------- status + pipeline ----------------
+  function setStatus(state, text){
+    const pill = el('statusPill');
+    pill.className = 'status-pill ' + state;
+    el('statusText').textContent = text;
+  }
+
+  function setStage(name, state){
+    // state: '', 'active', 'ok', 'fail'
+    const stage = el('stage-' + name);
+    stage.className = 'stage' + (state ? ' ' + state : '');
+  }
+
+  function resetPipeline(){
+    ['fetch','parse','extract','export'].forEach(s => setStage(s, ''));
+  }
+
+  // ---------------- networking ----------------
+  function toProxyUrl(url){
+    return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+  }
+
+  async function fetchHtml(url, mode){
+    const target = mode === 'proxy' ? toProxyUrl(url) : url;
+    const resp = await fetch(target, { headers: { 'Accept': 'text/html' } });
+    if(!resp.ok) throw new Error('HTTP ' + resp.status + ' fetching ' + url);
+    return await resp.text();
+  }
+
+  function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+  // ---------------- extraction ----------------
+  function extractFromHtml(html, itemSel, fields, baseUrl){
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const items = itemSel ? Array.from(doc.querySelectorAll(itemSel)) : [doc];
+    const records = [];
+    items.forEach(item => {
+      const rec = {};
+      fields.forEach(f => {
+        let node = f.sel ? item.querySelector(f.sel) : item;
+        if(!node){ rec[f.name] = null; return; }
+        if(f.attr === 'text'){
+          rec[f.name] = node.textContent.trim();
+        } else {
+          let v = node.getAttribute(f.attr);
+          if(v && (f.attr === 'href' || f.attr === 'src')){
+            try{ v = new URL(v, baseUrl).href; } catch(e){ /* leave as-is */ }
+          }
+          rec[f.name] = v;
+        }
+      });
+      records.push(rec);
+    });
+    return records;
+  }
+
+  function findNextPage(html, currentUrl, nextSel){
+    if(!nextSel) return null;
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const node = doc.querySelector(nextSel);
+    if(node && node.getAttribute('href')){
+      try{ return new URL(node.getAttribute('href'), currentUrl).href; } catch(e){ return null; }
+    }
+    return null;
+  }
+
+  // ---------------- rendering results ----------------
+  function renderResults(){
+    el('resultCount').textContent = results.length + ' record' + (results.length === 1 ? '' : 's');
+    el('exportCsv').disabled = results.length === 0;
+    el('exportJson').disabled = results.length === 0;
+
+    // JSON pane
+    el('jsonOut').textContent = JSON.stringify(results, null, 2);
+
+    // Table pane
+    const scroll = el('tableScroll');
+    if(results.length === 0){
+      scroll.innerHTML = '<div class="empty">No data yet — configure a target and click Run scrape.</div>';
+      return;
+    }
+    const cols = Array.from(results.reduce((set, r) => { Object.keys(r).forEach(k => set.add(k)); return set; }, new Set()));
+    let html = '<table><thead><tr>' + cols.map(c => `<th>${escapeHtml(c)}</th>`).join('') + '</tr></thead><tbody>';
+    results.forEach(r => {
+      html += '<tr>' + cols.map(c => {
+        const v = r[c];
+        if(v && typeof v === 'string' && v.startsWith('http')){
+          return `<td><a class="link" href="${escapeHtml(v)}" target="_blank" rel="noopener">${escapeHtml(v)}</a></td>`;
+        }
+        return `<td>${v === null || v === undefined ? '<span style="color:var(--muted)">—</span>' : escapeHtml(v)}</td>`;
+      }).join('') + '</tr>';
+    });
+    html += '</tbody></table>';
+    scroll.innerHTML = html;
+  }
+
+  // ---------------- export ----------------
+  function downloadBlob(content, filename, mime){
+    const blob = new Blob([content], {type: mime});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+  }
+
+  el('exportJson').addEventListener('click', () => {
+    downloadBlob(JSON.stringify(results, null, 2), 'scrape_results.json', 'application/json');
+    log('Exported ' + results.length + ' record(s) to scrape_results.json', 'ok');
+  });
+
+  el('exportCsv').addEventListener('click', () => {
+    if(results.length === 0) return;
+    const cols = Array.from(results.reduce((set, r) => { Object.keys(r).forEach(k => set.add(k)); return set; }, new Set()));
+    const escCsv = (v) => {
+      if(v === null || v === undefined) return '';
+      const s = String(v).replace(/"/g, '""');
+      return /[",\n]/.test(s) ? `"${s}"` : s;
+    };
+    let csv = cols.join(',') + '\n';
+    results.forEach(r => { csv += cols.map(c => escCsv(r[c])).join(',') + '\n'; });
+    downloadBlob(csv, 'scrape_results.csv', 'text/csv');
+    log('Exported ' + results.length + ' record(s) to scrape_results.csv', 'ok');
+  });
+
+  // ---------------- main run loop ----------------
+  el('stopBtn').addEventListener('click', () => {
+    stopRequested = true;
+    log('Stop requested — will halt after current page.', 'warn');
+  });
+
+  el('runBtn').addEventListener('click', async () => {
+    if(running) return;
+
+    const startUrl = el('startUrl').value.trim();
+    const itemSel = el('itemSel').value.trim();
+    const nextSel = el('nextSel').value.trim();
+    const maxPages = Math.max(1, parseInt(el('maxPages').value, 10) || 1);
+    const delay = Math.max(0, parseInt(el('delay').value, 10) || 0);
+    const mode = el('proxy').value;
+    const fields = getFields();
+
+    if(!startUrl){ log('No start URL provided.', 'err'); return; }
+    if(fields.length === 0){ log('Add at least one field to extract.', 'err'); return; }
+
+    running = true;
+    stopRequested = false;
+    results = [];
+    el('runBtn').disabled = true;
+    el('stopBtn').disabled = false;
+    el('logOut').innerHTML = '';
+    resetPipeline();
+    setStatus('run', 'RUNNING');
+    renderResults();
+
+    let url = startUrl;
+    let page = 0;
+
+    try{
+      while(url && page < maxPages && !stopRequested){
+        page++;
+        log(`Page ${page}/${maxPages}: ${url}`, 'info');
+
+        setStage('fetch', 'active');
+        let html;
+        try{
+          html = await fetchHtml(url, mode);
+          setStage('fetch', 'ok');
+        }catch(err){
+          setStage('fetch', 'fail');
+          log('Fetch failed: ' + err.message + (mode === 'direct' ? ' — try "Via CORS proxy" mode.' : ''), 'err');
+          break;
+        }
+
+        setStage('parse', 'active');
+        await sleep(80); // let UI paint
+        setStage('parse', 'ok');
+
+        setStage('extract', 'active');
+        let pageRecords = [];
+        try{
+          pageRecords = extractFromHtml(html, itemSel, fields, url);
+          setStage('extract', 'ok');
+        }catch(err){
+          setStage('extract', 'fail');
+          log('Extraction error: ' + err.message, 'err');
+          break;
+        }
+
+        log(`  → extracted ${pageRecords.length} record(s)`, pageRecords.length ? 'ok' : 'warn');
+        results = results.concat(pageRecords);
+        renderResults();
+
+        const next = nextSel ? findNextPage(html, url, nextSel) : null;
+        url = next;
+
+        if(url && page < maxPages && !stopRequested){
+          log(`  waiting ${delay}ms before next page...`, 'info');
+          await sleep(delay);
+        }
+      }
+
+      if(stopRequested){
+        log('Stopped by user.', 'warn');
+        setStatus('idle', 'STOPPED');
+      } else {
+        setStage('export', 'active');
+        await sleep(60);
+        setStage('export', 'ok');
+        log(`Done. ${results.length} total record(s) ready to export.`, 'ok');
+        setStatus('done', 'DONE');
+      }
+    }catch(err){
+      log('Unexpected error: ' + err.message, 'err');
+      setStatus('err', 'ERROR');
+    }finally{
+      running = false;
+      el('runBtn').disabled = false;
+      el('stopBtn').disabled = true;
+      renderResults();
+    }
+  });
+
+  log('Ready. Configure a target on the left and click "Run scrape".', 'info');
+})();
+</script>
+</body>
+</html>
